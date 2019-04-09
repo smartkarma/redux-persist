@@ -15,26 +15,29 @@ export default function getStoredState (config, onComplete) {
   let restoredState = {}
   let completionCount = 0
 
-  storage.getAllKeys((err, allKeys) => {
+  storage.getAllItems((err, allItems) => {
     if (err) {
-      if (process.env.NODE_ENV !== 'production') console.warn('redux-persist/getStoredState: Error in storage.getAllKeys')
-      complete(err)
+      if (process.env.NODE_ENV !== 'production') console.warn('redux-persist/getStoredState: Error in storage.getAllItems');
+      complete(err);
     }
 
-    let persistKeys = allKeys.filter((key) => key.indexOf(keyPrefix) === 0).map((key) => key.slice(keyPrefix.length))
-    let keysToRestore = persistKeys.filter(passWhitelistBlacklist)
+    const serializedKeys = Object.keys(allItems);
 
-    let restoreCount = keysToRestore.length
-    if (restoreCount === 0) complete(null, restoredState)
-    keysToRestore.forEach((key) => {
-      storage.getItem(createStorageKey(key), (err, serialized) => {
-        if (err && process.env.NODE_ENV !== 'production') console.warn('redux-persist/getStoredState: Error restoring data for key:', key, err)
-        else restoredState[key] = rehydrate(key, serialized)
-        completionCount += 1
-        if (completionCount === restoreCount) complete(null, restoredState)
-      })
-    })
-  })
+    const persistKeys = serializedKeys.filter((key) => key.indexOf(keyPrefix) === 0).map((key) => key.slice(keyPrefix.length));
+    const keysToRestore = persistKeys.filter(passWhitelistBlacklist);
+
+    const restoreCount = keysToRestore.length;
+    if (restoreCount === 0) complete(null, restoredState);
+
+    for (let i = 0; i < restoreCount; i++) {
+      const key = keysToRestore[i];
+      const prefixedKey = `${keyPrefix}${key}`;
+
+      restoredState[key] = rehydrate(key, allItems[prefixedKey]);
+      completionCount += 1;
+      if (completionCount === restoreCount) complete(null, restoredState);
+    }
+  });
 
   function rehydrate (key, serialized) {
     let state = null
